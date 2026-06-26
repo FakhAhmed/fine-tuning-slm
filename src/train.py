@@ -1,4 +1,3 @@
-cat << 'EOF' > src/train.py
 import os
 import mlflow
 from unsloth import FastLanguageModel
