@@ -1,0 +1,5 @@
+outs:
+- md5: a9d02869352b90fe920920c8df62c3d6
+  size: 1128771
+  hash: md5
+  path: financial_dataset.jsonl
