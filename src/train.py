@@ -7,7 +7,7 @@ from transformers import TrainingArguments
 
 print("🚀 Démarrage du pipeline de Fine-Tuning SLM...")
 
-# 1. Connexion à notre Tour de Contrôle MLflow (GCP Cloud Run)
+# 1. Connexion à notre Tour de Contrôle MLflow
 tracking_uri = os.environ.get("MLFLOW_TRACKING_URI")
 if tracking_uri:
     mlflow.set_tracking_uri(tracking_uri)
@@ -16,9 +16,9 @@ if tracking_uri:
 else:
     print("⚠️ MLFLOW_TRACKING_URI non défini. Tracking local.")
 
-# 2. Chargement du Modèle avec Unsloth (Llama-3 8B ou un modèle plus petit)
+# 2. Chargement du Modèle avec Unsloth
 max_seq_length = 2048
-model_name = "unsloth/llama-3-8b-bnb-4bit" # Modèle quantifié pour Colab
+model_name = "unsloth/llama-3-8b-bnb-4bit"
 
 print(f"📦 Chargement du modèle {model_name}...")
 model, tokenizer = FastLanguageModel.from_pretrained(
@@ -28,7 +28,6 @@ model, tokenizer = FastLanguageModel.from_pretrained(
     load_in_4bit=True,
 )
 
-# Configuration LoRA (Low-Rank Adaptation)
 model = FastLanguageModel.get_peft_model(
     model,
     r=16,
@@ -39,7 +38,7 @@ model = FastLanguageModel.get_peft_model(
     use_gradient_checkpointing="unsloth",
 )
 
-# 3. Préparation du Dataset Financier (récupéré via DVC)
+# 3. Préparation du Dataset
 print("📊 Chargement des données financières...")
 dataset = load_dataset("json", data_files="data/financial_dataset.jsonl", split="train")
 
@@ -58,7 +57,7 @@ training_args = TrainingArguments(
     per_device_train_batch_size=2,
     gradient_accumulation_steps=4,
     warmup_steps=5,
-    max_steps=60, # Court pour le PoC
+    max_steps=60,
     learning_rate=2e-4,
     fp16=not getattr(model, "is_bf16_supported", lambda: False)(),
     bf16=getattr(model, "is_bf16_supported", lambda: False)(),
@@ -67,26 +66,24 @@ training_args = TrainingArguments(
     weight_decay=0.01,
     lr_scheduler_type="linear",
     seed=3407,
-    report_to="mlflow", # 🔴 LA MAGIE EST ICI : Dit à HuggingFace d'utiliser MLflow
+    report_to="mlflow",
 )
 
 trainer = SFTTrainer(
     model=model,
-    tokenizer=tokenizer,
+    processing_class=tokenizer, # 🟢 La syntaxe moderne qui résout l'erreur précédente
     train_dataset=dataset,
     dataset_text_field="text",
     max_seq_length=max_seq_length,
     args=training_args,
 )
 
-# 5. Lancement
+# 5. Lancement !
 with mlflow.start_run():
     print("🔥 Début de l'entraînement...")
     trainer_stats = trainer.train()
     print("✅ Entraînement terminé !")
     
-    # Sauvegarde du modèle final
     model.save_pretrained("models/slm-finance-lora")
     tokenizer.save_pretrained("models/slm-finance-lora")
     print("💾 Modèle sauvegardé localement dans models/slm-finance-lora")
-EOF
